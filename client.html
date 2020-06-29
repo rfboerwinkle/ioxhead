@@ -3,26 +3,27 @@
 <title>Boxhead</title>
 <body>
 <b>Boxhead</b>
-<p>Controls: Arrows to move, "Z" and "X" to switch weapons. "C" to shoot.</p>
+<p>Controls: Arrows or WASD to move, "Z" and "X" to switch weapons. Mouse to aim; click to shoot.</p>
 <label for="fname">Name:</label> <input type="text" id="fname" name="fname">
 <input type="color" id="color">
 <button type="button" id="submitName">Submit</button><br>
 <div id="loading">Loading Layout</div>
-<canvas id="canv" width="500" height="500"></canvas>
-<img src="" id="spriteSheet">
+<canvas id="canv" width="500" height="500"></canvas><br>
+<input type="range" min="1" max="80" id="scaleSlider"><br>
+<input type="text" id="signBox">
+<button type="button" id="submitSign">Submit</button>
 </body>
 <script>
 "use strict";
 
-var br = document.createElement("br")
-
-class Keyboard{
+class Controls{
 	constructor(){
-		this.k = {"type":"controls", "data":{"up":false, "down":false, "left":false, "right":false, "fire":false}};
+		this.k = {"type":"controls", "data":{"up":false, "down":false, "left":false, "right":false, "fire":false, "dir":0.0}};
 	}
 }
 class Game{
 	constructor(myCanvas, spriteImg, wspath){
+		myCanvas.style.cursor = "crosshair";
 		this.x = 0;//camera location
 		this.y = 0;
 		this.px = 0;
@@ -38,10 +39,13 @@ class Game{
 		this.myCanvas = myCanvas;
 		var ctx = myCanvas.getContext("2d");
 		this.ctx = ctx;
-		this.myKeyboard = new Keyboard();
+		this.myKeyboard = new Controls();
 		var me = this;//for lambdas
 		document.addEventListener("keydown", event => {me.keyboard(event.keyCode, true, event.repeat);});
 		document.addEventListener("keyup", event => {me.keyboard(event.keyCode, false, event.repeat);});
+		myCanvas.addEventListener('mousedown', event => {me.mousedown(true);});
+		myCanvas.addEventListener('mouseup', event => {me.mousedown(false);});
+		myCanvas.addEventListener('mousemove', event => {me.mousemove(event.offsetX, event.offsetY);});
 		setInterval(function(){me.draw();}, 1000/20);
 	}
 	srvConnect(path){
@@ -76,7 +80,6 @@ class Game{
 	}
 	loadMap(wfm){
 		var map = document.createElement("canvas");
-//		document.body.appendChild(map);
 		this.maph = wfm.length;
 		this.mapw = wfm[0].length;
 		map.height = this.maph;
@@ -89,6 +92,18 @@ class Game{
 				this.map.push(wfm[i][j]);
 			}
 		}
+	}
+	mousedown(down){//down is boolean if mouse is down
+		var k = this.myKeyboard.k.data;
+		k["fire"] = down;
+		var msg = JSON.stringify(this.myKeyboard.k);
+		this.ws.send(msg);
+	}
+	mousemove(x, y){
+		var k = this.myKeyboard.k.data;
+		k["dir"] = Math.atan2(y-250, x-250);
+		var msg = JSON.stringify(this.myKeyboard.k);
+		this.ws.send(msg);
 	}
 	keyboard(code, down, repeat){
 		if(repeat){
@@ -284,31 +299,15 @@ if(wshostname == null){
 
 game = new Game(document.getElementById("canv"), spriteImg, "ws://"+wshostname+":9001");
 
-document.body.appendChild(br);
-
-var scaleSlider = document.createElement('input');
-scaleSlider.type = "range";
-scaleSlider.min = "1";
-scaleSlider.max = "80";
+var scaleSlider = document.getElementById("scaleSlider");
 scaleSlider.value = game.scale;
 scaleSlider.onchange = function(){
 	game.scale = scaleSlider.value;
 };
-document.body.appendChild(scaleSlider);
-
-document.body.appendChild(br);
-
-var signBox = document.createElement("textarea");
-signBox.rows = "1";
-signBox.cols = "50";
-document.body.appendChild(signBox);
-
-document.body.appendChild(br);
-
-var submitSign = document.createElement("button");
-submitSign.textContent = "Submit";
+var signBox = document.getElementById("signBox");
+var submitSign = document.getElementById("submitSign");
 submitSign.onclick = function(){
-	game.ws.send(JSON.stringify({"type":"sign", "data":signBox.value}));};
-document.body.appendChild(submitSign);
+	game.ws.send(JSON.stringify({"type":"sign", "data":signBox.value}));
+};
 </script>
 </html>
