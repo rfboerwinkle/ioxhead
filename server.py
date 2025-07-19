@@ -14,25 +14,21 @@ maps = []
 for picture in os.listdir("maps"):
 	if(picture != "lobby.png"):
 		maps.append(picture[:-4])
+maps.append("*caves")
 
+votinginfo = {"map":maps, "mode":["survival", "deathmatch", "capture the flag"], "proposed":[]}
+tosendvotinginfo = []
+
+Teams = []#[[spawn, spawn],[player, player], basecoords, score, flag]
 PLAYERS = []
 
-guninfo = [{"name":"pistol", "automatic":False, "range":8, "damage":2, "spread":2},{"name":"uzi", "automatic":True, "range":4, "damage":1, "spread":3},{"name":"shotgun", "automatic":False, "range":6, "damage":1, "spread":4},{"name":"railgun", "automatic":False, "range":12, "damage":6, "spread":0}, {"name":"rockets", "automatic":False}, {"name":"mines", "automatic":False}, {"name":"fake walls", "automatic":False}, {"name":"barrels", "automatic":False}]
+guninfo = {"pistol":{"automatic":False, "range":8, "damage":2, "spread":2, "maxammo":50}, "uzi":{"automatic":True, "range":4, "damage":1, "spread":3, "maxammo":200}, "shotgun":{"automatic":False, "range":6, "damage":1, "spread":4, "maxammo":40}, "railgun":{"automatic":False, "range":12, "damage":6, "spread":0, "maxammo":24}, "rockets":{"automatic":False, "maxammo":15}, "mines":{"automatic":False, "maxammo":15}, "fake walls":{"automatic":False, "maxammo":20}, "barrels":{"automatic":False, "maxammo":20}}
 
 boxinfo = [{"name":"health", "maxammo":20},{"name":"pistol", "maxammo":50},{"name":"uzi", "maxammo":200},{"name":"shotgun", "maxammo":40},{"name":"railgun", "maxammo":24}, {"name":"rockets", "maxammo":15}, {"name":"mines", "maxammo":15}, {"name":"fake walls", "maxammo":20}, {"name":"barrels", "maxammo":20}]
 
-def startingguns():
-	outgoing = []
-	for gun in guninfo:
-		ammo = 0
-		if(gun["name"] == "pistol"):
-			ammo = 50
-		outgoing.append({"name":gun["name"], "ammo":ammo})
-	return outgoing
-
 def loadmap(mapname):
-	global zombiespawns
-	global playerspawns
+	global redspawns
+	global bluespawns
 	global boxspawns
 	global mapheight
 	global mapwidth
@@ -53,11 +49,11 @@ def loadmap(mapname):
 	global demonqueue
 	global currentmap
 	global tosendmap
-	global VOTINGSTATIONS
 	global SIGNS
+	global Teams
 
+	Teams = [[[],[],[0,0],0,False],[[],[],[0,0],0,False]]
 	currentmap = mapname
-	VOTINGSTATIONS = []
 	SIGNS = []
 	DEMONS = []
 	ROCKETS = []
@@ -71,48 +67,119 @@ def loadmap(mapname):
 	demonwave = 0
 	demonqueue = 0
 
-	reader = png.Reader("maps/"+mapname+".png")
-	wallmap = reader.read()
-	wallmap = wallmap[2]
-	wallmap = list(wallmap)
+	if(mapname[0] == "*"):
+		if(mapname == "*caves"):
+			wallmap = []
+			mapheight = 50
+			mapwidth = 50
+			for y in range(mapheight):
+				wallmap.append([])
+				for x in range(mapwidth):
+					wallmap[-1].append(1)
+			rooms = []#[coords, size, thing inside, thing size, connections]
+			rooms.append([[random.randint(0,49), random.randint(0,49)], random.randint(2,5), 3, random.randint(1,2), []])
+			for room in range(random.randint(5, 8)):
+				choice = random.choice(rooms)
+				choice[4].append(len(rooms))
+				rooms.append([[random.randint(0,49), random.randint(0,49)], random.randint(2,5), random.randint(2,4), random.randint(1,3), []])
+			checklist = [0,0,0]
+			while (checklist != [1,1,1]):
+				checklist = [0,0,0]
+				for room in rooms:
+					if(room[2] == 2):
+						checklist[0] = 1
+					if(room[2] == 3):
+						checklist[1] = 1
+					if(room[2] == 4):
+						checklist[2] = 1
+				if(checklist != [1,1,1]):
+					if(checklist[0] == 0):
+						random.choice(rooms)[2] = 2
+					if(checklist[1] == 0):
+						random.choice(rooms)[2] = 3
+					if(checklist[2] == 0):
+						random.choice(rooms)[2] = 4
+			for room in rooms:
+				for x in range(-room[1], room[1]):
+					for y in range(-room[1], room[1]):
+						trial = [room[0][0] + x, room[0][1] + y]
+						if(checkborder(trial)):
+							wallmap[trial[1]][trial[0]] = 0
+				for hall in room[4]:
+					vector = [rooms[hall][0][0] - room[0][0], rooms[hall][0][1] - room[0][1]]
+					tofor = 0
+					toforo = 1
+					if(abs(vector[1]) > abs(vector[0])):
+						tofor = 1
+						toforo = 0
+					endcoords = [room[0][0]+vector[0], room[0][1]+vector[1]]
+					if(room[0][tofor] < endcoords[tofor]):
+						toin = range(round(room[0][tofor]), round(endcoords[tofor]))
+					else:
+						toin = range(round(endcoords[tofor]), round(room[0][tofor]))
+					coords = [0,0]
+					possible = []
+					for toinchk in toin:
+						coords[tofor] = toinchk
+						coords[toforo] = round(room[0][toforo] + vector[toforo] * (coords[tofor] - room[0][tofor]) / vector[tofor])
+						coords = [round(coords[0]), round(coords[1])]
+						possible.append([coords[0],coords[1]])
+					directions = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]]
+					trials = []
+					for square in possible:
+						for direction in directions:
+							trial = [square[0]+direction[0], square[1]+direction[1]]
+							trials.append([trial[0], trial[1]])
+					for trial in trials:
+						if not(trial in possible):
+							possible.append([trial[0],trial[1]])
+					for square in possible:
+						if(checkborder(square)):
+							wallmap[square[1]][square[0]] = 0
+			for room in rooms:
+				for x in range(-room[3], room[3]):
+					for y in range(-room[3], room[3]):
+						trial = [room[0][0]+x, room[0][1]+y]
+						if(checkborder(trial)):
+							wallmap[trial[1]][trial[0]] = room[2]
 
-	for line in range(len(wallmap)):
-		wallmap[line] = list(wallmap[line])
-		counter = 0
-		pixel = []
-		newline = []
-		for value in range(len(wallmap[line])):
-			pixel.append(wallmap[line][value])
-			counter += 1
-			if(counter == 3):
-				if(pixel == [255,255,255]):
-					newline.append(0)
-				elif(pixel == [0,0,0]):
-					newline.append(1)
-				elif(pixel == [255,0,0]):
-					newline.append(2)
-				elif(pixel == [0,0,255]):
-					newline.append(3)
-				elif(pixel == [255,255,0]):
-					newline.append(4)
-				pixel = []
-				counter = 0
-		wallmap[line] = newline.copy()
-		newline = []
+	else:
+		reader = png.Reader("maps/"+mapname+".png")
+		wallmap = reader.read()
+		wallmap = wallmap[2]
+		wallmap = list(wallmap)
 
-	if(currentmap == "lobby"):
-		votesection = []
-		for x in range(len(wallmap[0])):
-			votesection.append(0)
-
-		votesection[0] = 1
-		votesection[-1] = 1
-		votesection[1] = 5
-		votesection[-2] = 5
-
-		for x in range(math.ceil(len(maps)/2)):
-			wallmap.insert(-1, votesection.copy())
-		del(votesection)
+		for line in range(len(wallmap)):
+			wallmap[line] = list(wallmap[line])
+			counter = 0
+			pixel = []
+			newline = []
+			for value in range(len(wallmap[line])):
+				pixel.append(wallmap[line][value])
+				counter += 1
+				if(counter == 3):
+					if(pixel == [255,255,255]):#floor
+						newline.append(0)
+					elif(pixel == [0,0,0]):#wall
+						newline.append(1)
+					elif(pixel == [0,255,0]):#water
+						newline.append(2)
+					elif(pixel == [255,0,0]):#redspawn
+						newline.append(3)
+					elif(pixel == [0,0,255]):#bluespawn
+						newline.append(4)
+					elif(pixel == [255,255,0]):#boxspawn
+						newline.append(5)
+					elif(pixel == [0,255,255]):#blueflag
+						newline.append(6)
+					elif(pixel == [255,0,255]):#redflag
+						newline.append(7)
+					else:
+						print("uh oh! unregistered pixel! " + str(pixel))
+					pixel = []
+					counter = 0
+			wallmap[line] = newline.copy()
+			newline = []
 
 	mapheight = len(wallmap)
 	mapwidth = len(wallmap[0])
@@ -120,34 +187,56 @@ def loadmap(mapname):
 	unitmap = blankmap()
 	zombiemap = blankmap()
 	pathmap = blankmap()
-	zombiespawns = []
-	playerspawns = []
 	boxspawns = []
 
 	mapsleft = maps.copy()
 	for y in range(mapheight):
 		for x in range(mapwidth):
-			if(wallmap[y][x] == 2):
+			if(wallmap[y][x] == 3):
 				wallmap[y][x] = 0
-				zombiespawns.append([x,y])
-			elif(wallmap[y][x] == 3):
-				wallmap[y][x] = 0
-				playerspawns.append([x,y])
+				Teams[0][0].append([x,y])
 			elif(wallmap[y][x] == 4):
 				wallmap[y][x] = 0
-				boxspawns.append([[x,y],0])
+				Teams[1][0].append([x,y])
 			elif(wallmap[y][x] == 5):
 				wallmap[y][x] = 0
-				if(len(mapsleft) > 0):
-					SIGNS.append(sign(mapsleft[0], [x,y]))
-					VOTINGSTATIONS.append(votingstation(mapsleft[0], [x,y]))
-					del(mapsleft[0])
+				boxspawns.append([[x,y],0])
+			elif(wallmap[y][x] == 6):
+				wallmap[y][x] = 0
+				Teams[1][2] = [x,y]
+			elif(wallmap[y][x] == 7):
+				wallmap[y][x] = 0
+				Teams[0][2] = [x,y]
+
+	if(gamemode == "capture the flag"):
+		for team in range(len(Teams)):
+			Teams[team][4] = flag(team)
 
 	tosendmap = []
 	for user in PLAYERS:
+		assignteam(user)
 		user.respawn(clear = False)
-		user.mapvote = False
+		user.vote = False
 		tosendmap.append(user)
+		if(currentmap == "lobby"):
+			tosendvotinginfo.append(user)
+
+def assignteam(tobeassigned):
+	if(gamemode == "deathmatch" or gamemode == "capture the flag"):
+		choices = [0]
+		for team in range(len(Teams)):
+			if(len(Teams[team][1]) < len(Teams[choices[0]][1])):
+				choices = [team]
+			elif(len(Teams[team][1]) == len(Teams[choices[0]][1])):
+				choices.append(team)
+		finalanswer = random.choice(choices)
+	elif(gamemode == "survival"):
+		finalanswer = 1
+	else:
+		print("Unknown gamemode!")
+	tobeassigned.team = finalanswer
+	Teams[finalanswer][1].append(tobeassigned)
+
 
 def blankmap():
 	blankmap = []
@@ -180,6 +269,34 @@ def waitFramerate(T): #TODO if we have enough time, call the garbage collector
 	else:
 		lastTime = ctime
 
+class flag:
+	def __init__(self, team):
+		self.team = team
+		self.coords = Teams[team][2]
+		self.partialcoords = [.5,.5]
+		self.carrier = False
+	def check(self):
+		if(self.carrier):
+			self.coords = [self.carrier.coords[0], self.carrier.coords[1]]
+			self.partialcoords = [self.carrier.partialcoords[0], self.carrier.partialcoords[1]]
+			for team in range(len(Teams)):
+				if(self.coords == Teams[team][2] and team != self.team):
+					self.coords = Teams[self.team][2]
+					self.partialcoords = [.5, .5]
+					Teams[team][3] += 1
+					self.carrier = False
+					print(self.team, " flag brought to enemy base")
+		else:
+			for unit in unitmap[self.coords[1]][self.coords[0]]:
+				if(isinstance(unit, player)):
+					if(unit.team == self.team):
+						self.coords = Teams[self.team][2]
+						self.partialcoords = [.5,.5]
+						print(self.team, " flag return")
+					else:
+						self.carrier = unit
+						print(self.team, " flag pick up")
+
 class sign:
 	moveable = False
 	shootable = True
@@ -191,16 +308,7 @@ class sign:
 		self.coords = coords
 		self.partialcoords = [.5,.5]
 		self.health = 1
-
-class votingstation:
-	moveable = False
-	shootable = False
-	walkable = True
-	def __init__(self, mapchoice, coords):
-		global unitmap
-		unitmap[coords[1]][coords[0]].append(self)
-		self.mapchoice = mapchoice
-		self.coords = coords
+		self.lasthit = 0
 
 class rocket:
 	def __init__(self, owner):
@@ -213,7 +321,9 @@ class rocket:
 		endcoords = [self.coords[0]+vector[0], self.coords[1]+vector[1]]
 		hit = bulletcheck(self.coords, self.direction, self.velocity, self.owner)
 		for unit in hit[0]:
-			explosion(unit.coords, 3, 10)
+			victims = explosion(unit.coords, 3, 10)
+			for victim in victims:
+				victims.lasthit = self.owner.team
 			ROCKETS.remove(self)
 		self.coords = [endcoords[0], endcoords[1]]
 		self.velocity += .05
@@ -228,7 +338,7 @@ class box:
 			ammo = {"name":ammo["name"], "ammo":random.randint(1,ammo["maxammo"])}
 		self.coords = coords
 		self.ammo = ammo
-		self.health = False
+		self.time = 500
 		unitmap[coords[1]][coords[0]].append(self)
 
 class enemy:
@@ -243,6 +353,7 @@ class enemy:
 		self.movement = 1
 		self.direction = [0,0]
 		self.radius = .4
+		self.lasthit = 0
 
 	def decidedirection(self):
 		self.movement = 0
@@ -399,16 +510,18 @@ class player:
 		self.selectedgun = 0
 		self.facedir = 0.0 #facing direction in radians
 		self.name = {"name":"player", "color":"#0000ff"}
-		self.actions = {"up":False, "down":False, "left":False, "right":False, "prev":False, "next":False, "fire":False}
+		self.actions = {"up":False, "down":False, "left":False, "right":False, "fire":False, "use":False}
 		self.gunready = True
 		self.respawntimer = 300
 		self.immunewall = False
-		self.move = False
-		self.mapvote = False
+		self.vote = False
 		self.radius = .4
+		self.move = False
+		self.team = 0
+		self.lasthit = 0
 		tosendmap.append(self)#puts self on the list of people that need the map
 
-	def setfacedir(self):
+	def setmovedir(self):
 		vec = [0,0]
 		if(self.actions["up"]):
 			vec[1]-=1
@@ -419,22 +532,27 @@ class player:
 		if(self.actions["right"]):
 			vec[0]+=1
 		if vec[0] != 0 or vec[1] != 0:#if 0 vector, don't change facing direction
-			self.facedir = math.atan2(vec[1], vec[0])
+			self.movedir = math.atan2(vec[1], vec[0])
 			self.move = True
 		else:
 			self.move = False
+
 	def respawn(self, clear = True):
 		self.gunready = True
 		if(clear):
 			if(self in unitmap[self.coords[1]][self.coords[0]]):
 				unitmap[self.coords[1]][self.coords[0]].remove(self)
 		self.health = 20
-		self.coords = random.choice(playerspawns)
+		self.coords = random.choice(Teams[self.team][0])
 		self.partialcoords = [.5,.5]
 		self.selectedgun = 0
-		self.guns = startingguns()
+		self.guns = [{"name":"pistol", "ammo":50}, {"name":"none", "ammo":0}]
 		self.respawntimer = 300
 		unitmap[self.coords[1]][self.coords[0]].append(self)
+		if(gamemode == "capture the flag"):
+			for team in Teams:
+				if(team[4].carrier == self):
+					team[4].carrier = False
 	def fire(self):
 		if(self.guns[self.selectedgun]["name"] == "mines"):
 			placing = True
@@ -443,7 +561,7 @@ class player:
 					placing = False
 					break
 			if(placing):
-				MINES.append(mine(self.coords, self))
+				MINES.append(mine(self.coords, self, self.team))
 			else:
 				self.guns[self.selectedgun]["ammo"] += 1
 			return True
@@ -475,16 +593,16 @@ class player:
 			ROCKETS.append(rocket(self))
 			return True
 		startcoords = [self.coords[0]+self.partialcoords[0], self.coords[1]+self.partialcoords[1]]
-		spreadpossible = guninfo[self.selectedgun]["spread"]
+		spreadpossible = guninfo[self.guns[self.selectedgun]["name"]]["spread"]
 		spread = random.randint(spreadpossible*-1, spreadpossible)/20
 		bulletdir = self.facedir+spread
-		if(guninfo[self.selectedgun]["name"] == "railgun"):
-			hit = bulletcheck(startcoords, bulletdir, guninfo[self.selectedgun]["range"], self, True)
+		if(self.guns[self.selectedgun]["name"] == "railgun"):
+			hit = bulletcheck(startcoords, bulletdir, guninfo[self.guns[self.selectedgun]["name"]]["range"], self, True)
 		else:
-			hit = bulletcheck(startcoords, bulletdir, guninfo[self.selectedgun]["range"], self)
-		if(hit[0]):
-			for unit in hit[0]:
-				unit.health -= guninfo[self.selectedgun]["damage"]
+			hit = bulletcheck(startcoords, bulletdir, guninfo[self.guns[self.selectedgun]["name"]]["range"], self)
+		for unit in hit[0]:
+			unit.health -= guninfo[self.guns[self.selectedgun]["name"]]["damage"]
+			unit.lasthit = self.team
 
 def bulletcheck(startcoords, radian, distance, immune, piercing = False, show = True):
 	possible = []
@@ -580,6 +698,7 @@ class wall:
 		self.health = 0
 		self.coords = coords
 		self.partialcoords = [.5,.5]
+		self.lasthit = 0
 
 def distance(coordsone, coordstwo):
 	output = math.sqrt((coordsone[0] - coordstwo[0])**2 + (coordsone[1] - coordstwo[1])**2)
@@ -595,6 +714,7 @@ class fakewall:
 		self.health = 5
 		unitmap[coords[1]][coords[0]].append(self)
 		self.radius = .6
+		self.lasthit = 0
 
 class barrel:
 	moveable = False
@@ -606,12 +726,13 @@ class barrel:
 		self.health = 1
 		unitmap[coords[1]][coords[0]].append(self)
 		self.radius = .6
+		self.lasthit = 0
 
 class mine:
 	moveable = False
 	shootable = False
 	walkable = True
-	def __init__(self, coords, layer):
+	def __init__(self, coords, layer, team):
 		self.moveable = False
 		self.shootable = False
 		self.walkable = True
@@ -621,6 +742,7 @@ class mine:
 		self.finalcountdown = 20
 		unitmap[self.coords[1]][self.coords[0]].append(self)
 		self.health = False
+		self.team = team
 	def check(self):
 		if(self.phase == 0):
 			if not(self.layer in unitmap[self.coords[1]][self.coords[0]]):
@@ -628,17 +750,20 @@ class mine:
 		elif(self.phase == 1):
 			units = unitmap[self.coords[1]][self.coords[0]]
 			for unit in units:
-				if(unit != self):
+				if(unit != self and unit.walkable == False):
 					self.phase = 2
 		elif(self.phase == 2):
 			self.finalcountdown -= 1
 			if(self.finalcountdown < 0):
-				explosion(self.coords, 4, 6)
+				hits = explosion(self.coords, 4, 6)
+				for hit in hits:
+					hit.lasthit = self.team
 				MINES.remove(self)
 				unitmap[self.coords[1]][self.coords[0]].remove(self)
 
 def explosion(coords, radius, power):
 	explosions.append({"coords":coords, "radius":radius})
+	output = []
 	for x in range(radius*2+1):
 		xdist = x-radius
 		for y in range(radius*2+1):
@@ -653,21 +778,30 @@ def explosion(coords, radius, power):
 				if(unit.shootable):
 					if(unit.health):
 						unit.health -= damage
+						output.append(unit)
+	return output
 
 async def register(websocket):
 	print("client got")
 	PLAYERS.append(player(websocket))
+	assignteam(PLAYERS[-1])
 	PLAYERS[-1].respawn()
+	if(currentmap == "lobby"):
+		tosendvotinginfo.append(PLAYERS[-1])
 
 async def unregister(websocket):
-	print("client lost", websocket)
 	for user in PLAYERS:
 		if(user.websocket == websocket):
 			unitmap[user.coords[1]][user.coords[0]].remove(user)
+			print("client lost:", user.name["name"])
+			for team in Teams:
+				for unit in team[1]:
+					if(unit == user):
+						team[1].remove(unit)
 			PLAYERS.remove(user)
 
 async def boxhead(websocket, path):
-	global PLAYERS
+	global PLAYERS, voteupdate
 	await register(websocket)
 	try:
 		async for message in websocket:
@@ -676,13 +810,16 @@ async def boxhead(websocket, path):
 				if(user.websocket == websocket):
 					if(data["type"] == "controls"):
 						user.actions = data["data"]
-						user.setfacedir()
+						user.facedir = data["data"]["dir"]
+						user.setmovedir()
+						del(user.actions["dir"])
 					elif(data["type"] == "name"):
 						user.name = data["data"]
 					elif(data["type"] == "gun"):
 						user.selectedgun = data["data"]
-					elif(data["type"] == "mapvote"):
-						user.mapvote = data["data"]
+					elif(data["type"] == "vote"):
+						user.vote = data["data"]
+						voteupdate = True
 					elif(data["type"] == "sign"):
 						SIGNS.append(sign(data["data"], user.coords))
 					else:
@@ -691,7 +828,7 @@ async def boxhead(websocket, path):
 		await unregister(websocket)
 
 def getZSpawn():
-	trial = random.choice(zombiespawns)
+	trial = random.choice(Teams[0][0])
 	for unit in unitmap[trial[1]][trial[0]]:
 		if(unit.walkable == False):
 			trial = None
@@ -754,7 +891,7 @@ def search(start, goals):
 					break
 				if(unit.walkable == False and not isinstance(unit, zombie) and not isinstance(unit, fakewall) and not isinstance(unit, barrel)):
 					allbets = False
-			if(wallmap[newcoords[1]][newcoords[0]] == 1 or statusMap[newcoords[0]+mapwidth*newcoords[1]] == 1):
+			if(wallmap[newcoords[1]][newcoords[0]] or statusMap[newcoords[0]+mapwidth*newcoords[1]] == 1):
 				allbets = False
 			if(allbets):
 				openlist.append(Node(newcoords, current.g+1, current))
@@ -777,6 +914,7 @@ def makepathmap():
 
 bullets = []
 explosions = []
+gamemode = "survival"
 loadmap("lobby")
 def MainLoop():
 	global demonqueue
@@ -785,7 +923,8 @@ def MainLoop():
 	global zombiewave
 	global zombie
 	global bullets
-	global explosions
+	global explosions, voteupdate
+	global gamemode
 	pathingtimer = 9
 	boxspawnrate = 100
 	checktimer = 5
@@ -826,7 +965,7 @@ def MainLoop():
 				print("there are "+str(zombiecount)+" zombies in the zombiemap when there should be "+str(len(ZOMBIES)))
 			if(demoncount != len(DEMONS)):
 				print("there are "+str(demoncount)+" demons in the zombiemap when there should be "+str(len(DEMONS)))
-		if(zombiequeue == 0 and len(ZOMBIES) == 0 and demonqueue == 0 and len(DEMONS) == 0):
+		if(zombiequeue == 0 and len(ZOMBIES) == 0 and demonqueue == 0 and len(DEMONS) == 0 and gamemode == "survival"):
 			zombiewave += 5
 			zombiequeue = zombiewave
 			demonwave += 1
@@ -839,13 +978,21 @@ def MainLoop():
 			if(unit.health <= 0):
 				unitmap[unit.coords[1]][unit.coords[0]].remove(unit)
 				BARRELS.remove(unit)
-				explosion(unit.coords, 4, 7)
+				hits = explosion(unit.coords, 4, 7)
+				for hit in hits:
+					hit.lasthit = unit.lasthit
 		for unit in FAKEWALLS:
 			if(unit.health <= 0):
 				unitmap[unit.coords[1]][unit.coords[0]].remove(unit)
 				FAKEWALLS.remove(unit)
 		for unit in MINES:
 			unit.check()
+		for unit in BOXES:
+			if(unit.time > 0):
+				unit.time -= 1
+			else:
+				unitmap[unit.coords[1]][unit.coords[0]].remove(unit)
+				BOXES.remove(unit)
 		for square in boxspawns:
 			full = False
 			units = unitmap[square[0][1]][square[0][0]]
@@ -884,8 +1031,18 @@ def MainLoop():
 		for unit in ROCKETS:
 			if not(checkborder([math.floor(unit.coords[0]), math.floor(unit.coords[1])])):
 				ROCKETS.remove(unit)
+				continue
 			unit.move()
 		waitFramerate(1/20)
+
+		for team in range(len(Teams)):
+			if(gamemode == "capture the flag"):
+				Teams[team][4].check()
+			if(Teams[team][3] >= 10):
+				print(str(team)+" Team is victorious!")
+				gamemode = "survival"
+				loadmap("lobby")
+
 		alldown = False
 		if(PLAYERS):
 			alldown = True
@@ -893,18 +1050,24 @@ def MainLoop():
 			if(user.health < 0):
 					user.health = 0
 			if(user.health == 0):
+				if(gamemode == "deathmatch" or gamemode == "capture the flag"):
+					user.respawntimer = 0
 				user.respawntimer -= 1
 				if(user.respawntimer < 0):
-					DEMONS.append(demon(user.coords[0], user.coords[1]))
+					if(gamemode == "survival"):
+						DEMONS.append(demon(user.coords[0], user.coords[1]))
+					if(gamemode == "deathmatch"):
+						if(user.team != user.lasthit):
+							Teams[user.lasthit][3] += 1
 					user.respawn()
-				user.actions = {"up":False,"down":False,"left":False,"right":False,"fire":False}
+				user.actions = {"up":False,"down":False,"left":False,"right":False,"fire":False,"use":False}
 				user.move = False
 			else:
 				alldown = False
 			trialpartialcoords = [user.partialcoords[0], user.partialcoords[1]]
 			trialcoords = [user.coords[0], user.coords[1]]
 			if(user.move):
-				vector = [math.cos(user.facedir)*.2,math.sin(user.facedir)*.2]
+				vector = [math.cos(user.movedir)*.2,math.sin(user.movedir)*.2]
 				trialpartialcoords = [trialpartialcoords[0]+vector[0], trialpartialcoords[1]+vector[1]]
 			units = []
 			for direction in [[0,0],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]]:
@@ -918,7 +1081,7 @@ def MainLoop():
 				unitcoords = [unit.coords[0]+unit.partialcoords[0], unit.coords[1]+unit.partialcoords[1]]
 				distance = math.sqrt((unitcoords[0]-usercoords[0])**2+(unitcoords[1]-usercoords[1])**2)
 				if(distance < (unit.radius + user.radius)):
-					if(isinstance(unit, player) and unit.health <= 0):
+					if(isinstance(unit, player) and unit.health <= 0 and unit.team == user.team):
 						unit.health = 1
 						unit.respawntimer = 300
 					tomove = (unit.radius + user.radius) - distance
@@ -928,17 +1091,6 @@ def MainLoop():
 					usercoords = [usercoords[0]-(vector[0]*tomove), usercoords[1]-(vector[1]*tomove)]
 					trialcoords = [math.floor(usercoords[0]), math.floor(usercoords[1])]
 					trialpartialcoords = [usercoords[0] - math.floor(usercoords[0]), usercoords[1] - math.floor(usercoords[1])]
-			if(user.actions["fire"]):
-				if(user.gunready and user.guns[user.selectedgun]["ammo"] > 0):
-					user.guns[user.selectedgun]["ammo"] -= 1
-					user.fire()
-					if(user.guns[user.selectedgun]["name"] == "shotgun"):
-						for time in range(9):
-							user.fire()
-				if not(guninfo[user.selectedgun]["automatic"]):
-					user.gunready = False
-			else:
-				user.gunready = True
 			newsquare = False
 			if(trialpartialcoords[0] < 0):
 				trialcoords[0] -= 1
@@ -959,62 +1111,73 @@ def MainLoop():
 			if(newsquare):
 				user.immunewall = False
 			if(checkborder(trialcoords)):
-				if(wallmap[trialcoords[1]][trialcoords[0]] != 1):
+				if(wallmap[trialcoords[1]][trialcoords[0]] == 0):
 					unitmap[user.coords[1]][user.coords[0]].remove(user)
 					user.coords = [trialcoords[0], trialcoords[1]]
 					user.partialcoords = [trialpartialcoords[0], trialpartialcoords[1]]
 					for unit in unitmap[user.coords[1]][user.coords[0]]:
 						if(isinstance(unit, box)):
-							for gun in user.guns:
-								if(unit.ammo["name"] == "health"):
-									user.health += unit.ammo["ammo"]
-									if(user.health > 20):
-										user.health = 20
-									break
-								if(gun["name"] == unit.ammo["name"]):
-									gun["ammo"] += unit.ammo["ammo"]
-									for gun2 in boxinfo:
-										if(gun2["name"] == gun["name"]):
-											if(gun["ammo"] > gun2["maxammo"]):
-												gun["ammo"] = gun2["maxammo"]
-											break
-									break
-							BOXES.remove(unit)
-							unitmap[user.coords[1]][user.coords[0]].remove(unit)
-						if(isinstance(unit, votingstation)):
-							user.mapvote = unit.mapchoice
+							remove = False
+							if(unit.ammo["name"] == "health"):
+								remove = True
+								user.health += unit.ammo["ammo"]
+								if(user.health > 20):
+									user.health = 20
+							else:
+								taken = False
+								for gun in range(len(user.guns)):
+									if(user.guns[gun]["name"] == unit.ammo["name"]):
+										remove = True
+										taken = True
+										user.guns[gun]["ammo"] += unit.ammo["ammo"]
+										if(user.guns[gun]["ammo"] > guninfo[user.guns[gun]["name"]]["maxammo"]):
+											user.guns[gun]["ammo"] = guninfo[user.guns[gun]["name"]]["maxammo"]
+								if(taken == False and user.actions["use"]):
+									user.guns[user.selectedgun] = unit.ammo
+									remove = True
+							if(remove):
+								BOXES.remove(unit)
+								unitmap[user.coords[1]][user.coords[0]].remove(unit)
 					unitmap[user.coords[1]][user.coords[0]].append(user)
+
+			if(user.actions["fire"] and user.guns[user.selectedgun]["name"] != "none"):
+				if(user.gunready and user.guns[user.selectedgun]["ammo"] > 0):
+					user.guns[user.selectedgun]["ammo"] -= 1
+					user.fire()
+					if(user.guns[user.selectedgun]["name"] == "shotgun"):
+						for time in range(9):
+							user.fire()
+				if not(guninfo[user.guns[user.selectedgun]["name"]]["automatic"]):
+					user.gunready = False
+			else:
+				user.gunready = True
 
 		if(alldown):
 			loadmap("lobby")
+			gamemode = "survival"
 
 		if(currentmap == "lobby"):
-			mapvotes = []
-			for option in maps:
-				mapvotes.append([option, 0])
+			votinginfo["proposed"] = []
 			ready = True
 			if not(PLAYERS):
 				ready = False
 			for user in PLAYERS:
-				if(user.mapvote):
-					for option in mapvotes:
-						if(option[0] == user.mapvote):
-							option[1] += 1
+				if(user.vote):
+					votinginfo["proposed"].append(user.vote)
 				else:
 					ready = False
 			if(ready):
-				mapvotes.sort(key = lambda x: x[1])
-				score = mapvotes[-1][1]
-				tie = []
-				for entry in reversed(mapvotes):
-					if(score == entry[1]):
-						tie.append(entry[0])
-					else:
-						break
-				selection = random.choice(tie)
-				loadmap(selection)
+				selection = random.choice(PLAYERS).vote
+				gamemode = selection["mode"]
+				loadmap(selection["map"])
+				votingclosed = True
 
-		outgoing = {"type":"frame", "players":[], "zombies":[], "demons":[], "boxes":[], "camera":[], "partialcamera":[], "HUD":None, "bullets":bullets, "explosions":explosions, "mines":[], "fakewalls":[], "barrels":[], "signs":[], "log":[]}
+		outgoing = {"type":"frame", "players":[], "zombies":[], "demons":[], "boxes":[], "camera":[], "partialcamera":[], "HUD":False, "bullets":bullets, "explosions":explosions, "mines":[], "fakewalls":[], "barrels":[], "signs":[], "scores":[], "flags":[]}
+		for team in range(len(Teams)):
+			outgoing["scores"].append(Teams[team][3])
+			if(gamemode == "capture the flag"):
+				outgoing["flags"].append({"coords":Teams[team][4].coords, "partialcoords":Teams[team][4].partialcoords})
+				outgoing["signs"].append({"coords":Teams[team][4].coords, "message":str(team)})
 		for unit in SIGNS:
 			outgoing["signs"].append({"coords":unit.coords, "message":unit.message})
 		for unit in BARRELS:
@@ -1026,21 +1189,30 @@ def MainLoop():
 		for unit in MINES:
 			outgoing["mines"].append(unit.coords)
 		for user in PLAYERS:
-			outgoing["players"].append({"coords":user.coords, "partialcoords":user.partialcoords, "gun":user.guns[user.selectedgun]["name"], "name":user.name, "facedir":user.facedir})
+			outgoing["players"].append({"coords":user.coords, "partialcoords":user.partialcoords, "gun":user.guns[user.selectedgun]["name"], "name":user.name, "facedir":user.facedir, "team":user.team})
 		for unit in ZOMBIES:
 			outgoing["zombies"].append({"coords":unit.coords, "partialcoords":unit.partialcoords})
 		for unit in BOXES:
-			outgoing["boxes"].append(unit.coords)
+			outgoing["boxes"].append({"coords":unit.coords, "gun":unit.ammo["name"]+":"+str(unit.ammo["ammo"])})
 		for user in PLAYERS:
 			outgoing["camera"] = user.coords
 			outgoing["partialcamera"] = user.partialcoords
 			outgoing["HUD"] = {"health":user.health, "guns":user.guns, "gun":user.selectedgun}
 			outgoingMsg = json.dumps(outgoing)
 			asyncio.run(user.websocket.send(outgoingMsg)) #Really, we shouldn't call run each time. We need to make a separate message collector event loop handle thing
+			if(votingclosed):
+				asyncio.run(user.websocket.send(json.dumps({"type":"votingover"})))
+			if(user in tosendvotinginfo):
+				tosendvotinginfo.remove(user)
+				asyncio.run(user.websocket.send(json.dumps({"type":"votinginfo", "data":{"map":votinginfo["map"], "mode":votinginfo["mode"]}})))
+			if(voteupdate):
+				asyncio.run(user.websocket.send(json.dumps({"type":"votes", "data":votinginfo["proposed"]})))
 			if(user in tosendmap):
 				tosendmap.remove(user)
 				asyncio.run(user.websocket.send(json.dumps({"type":"mapdata", "map":wallmap})))
 				print("map sent")
+		voteupdate = False
+		votingclosed = False
 
 GameThread = None
 GameThread = threading.Thread(group=None, target=MainLoop, name="GameThread")
