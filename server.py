@@ -323,7 +323,7 @@ class rocket:
 		for unit in hit[0]:
 			victims = explosion(unit.coords, 3, 10)
 			for victim in victims:
-				victims.lasthit = self.owner.team
+				victim.lasthit = self.owner.team
 			ROCKETS.remove(self)
 		self.coords = [endcoords[0], endcoords[1]]
 		self.velocity += .05
@@ -354,6 +354,7 @@ class enemy:
 		self.direction = [0,0]
 		self.radius = .4
 		self.lasthit = 0
+		self.team = 0
 
 	def decidedirection(self):
 		self.movement = 0
@@ -565,7 +566,7 @@ class player:
 			else:
 				self.guns[self.selectedgun]["ammo"] += 1
 			return True
-		if(self.guns[self.selectedgun]["name"] == "fake walls"):
+		elif(self.guns[self.selectedgun]["name"] == "fake walls"):
 			placing = True
 			for unit in unitmap[self.coords[1]][self.coords[0]]:
 				if(isinstance(unit, fakewall) or isinstance(unit, mine) or isinstance(unit, barrel)):
@@ -577,7 +578,7 @@ class player:
 			else:
 				self.guns[self.selectedgun]["ammo"] += 1
 			return True
-		if(self.guns[self.selectedgun]["name"] == "barrels"):
+		elif(self.guns[self.selectedgun]["name"] == "barrels"):
 			placing = True
 			for unit in unitmap[self.coords[1]][self.coords[0]]:
 				if(isinstance(unit, fakewall) or isinstance(unit, mine) or isinstance(unit, barrel)):
@@ -589,7 +590,7 @@ class player:
 			else:
 				self.guns[self.selectedgun]["ammo"] += 1
 			return True
-		if(self.guns[self.selectedgun]["name"] == "rockets"):
+		elif(self.guns[self.selectedgun]["name"] == "rockets"):
 			ROCKETS.append(rocket(self))
 			return True
 		startcoords = [self.coords[0]+self.partialcoords[0], self.coords[1]+self.partialcoords[1]]
