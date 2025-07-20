@@ -226,7 +226,7 @@ class Game{
 	draw(){
 		var ctx = this.ctx;
 		ctx.font = "10px monospace";
-		ctx.fillStyle = "#707070";//Tile center color
+		ctx.fillStyle = "#909090";//Tile center color
 		ctx.fillRect(0, 0, 500, 500);
 		var vrange = Math.ceil(250/this.scale);//-1 for validation only
 		//var vrange = Math.ceil(250/this.scale)-1;//-1 for validation only
@@ -250,12 +250,12 @@ class Game{
 		var me = this;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.fillStyle = "#000000";
+		ctx.fillStyle = "#FFFFFF";
 		this.boxes.forEach(box => {//RB display box with text
 			ctx.drawImage(this.spriteImg, 0, 60, 43, 43, 250+me.scale*box.coords[0]-me.scale*me.px-me.scale*me.x+0.2*me.scale, 250+me.scale*box.coords[1]-me.scale*me.py-me.scale*me.y+0.2*me.scale, me.scale*0.6, me.scale*0.6);
 			var cx = 250+me.scale*box.coords[0]-me.scale*me.px-me.scale*me.x+me.scale*0.5;
 			var cy = 250+me.scale*box.coords[1]-me.scale*me.py-me.scale*me.y+me.scale*0.5;
-			ctx.fillText(box.gun, cx, cy);
+			ctx.fillText(box.gun, cx, cy+me.scale*0.45);
 		});
 		this.mines.forEach(mine => {
 			ctx.drawImage(this.spriteImg, 43, 60, 43, 43, 250+me.scale*mine[0]-me.scale*me.px-me.scale*me.x+0.2*me.scale, 250+me.scale*mine[1]-me.scale*me.py-me.scale*me.y+0.2*me.scale, me.scale*0.6, me.scale*0.6);
@@ -288,7 +288,7 @@ class Game{
 					var rot = [outline[idx*2]*cos-outline[idx*2+1]*sin, outline[idx*2]*sin+outline[idx*2+1]*cos];
 					ctx.lineTo(me.scale*rot[0]+dx, me.scale*rot[1]+dy);
 				}
-				ctx.closePath();				
+				ctx.closePath();
 			}else{
 				ctx.moveTo(dx, dy);
 				ctx.lineTo(dx+me.scale*0.4*cos, dy+me.scale*0.4*sin);
